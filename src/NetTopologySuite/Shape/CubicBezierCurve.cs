@@ -271,7 +271,7 @@ namespace NetTopologySuite.Shape
         /// <para/>
         /// The control point array contains a pair of coordinates for each input segment.
         /// </summary>
-        private static Coordinate[] ControlPoints(Coordinate[] coords, bool isRing, double alpha, double skew)
+        public static Coordinate[] ControlPoints(Coordinate[] coords, bool isRing, double alpha, double skew)
         {
             int N = coords.Length;
             int start = 1;
