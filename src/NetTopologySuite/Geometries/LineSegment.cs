@@ -1,6 +1,7 @@
 using System;
 using System.Text;
 using NetTopologySuite.Algorithm;
+using NetTopologySuite.IO;
 using BitConverter = System.BitConverter;
 
 namespace NetTopologySuite.Geometries
@@ -163,12 +164,12 @@ namespace NetTopologySuite.Geometries
         {
             int orient0 = (int)Orientation.Index(_p0, _p1, seg._p0);
             int orient1 = (int)Orientation.Index(_p0, _p1, seg._p1);
-            // this handles the case where the points are Curve or collinear
+            // this handles the case where the points are L or collinear
             if (orient0 >= 0 && orient1 >= 0)
                 return Math.Max(orient0, orient1);
             // this handles the case where the points are R or collinear
             if (orient0 <= 0 && orient1 <= 0)
-                return Math.Max(orient0, orient1);
+                return Math.Min(orient0, orient1);
             // points lie on opposite sides ==> indeterminate orientation
             return 0;
         }
@@ -677,21 +678,17 @@ namespace NetTopologySuite.Geometries
                    _p0.Equals(other._p1) && _p1.Equals(other._p0);
         }
 
-        private static readonly System.Globalization.CultureInfo _cultureInfo =
-            System.Globalization.CultureInfo.InvariantCulture;
-
         /// <summary>
-        ///
+        /// 
         /// </summary>
         /// <returns></returns>
-        ///
         public override string ToString()
         {
-            var sb = new StringBuilder("LINESTRING( ");
-            sb.AppendFormat(_cultureInfo, "{0}", _p0.X).Append(" ");
-            sb.AppendFormat(_cultureInfo, "{0}", _p0.Y).Append(", ");
-            sb.AppendFormat(_cultureInfo, "{0}", _p1.X).Append(" ");
-            sb.AppendFormat(_cultureInfo, "{0}", _p1.Y).Append(")");
+            var sb = new StringBuilder($"{WKTConstants.LINESTRING} (");
+            sb.Append(OrdinateFormat.Default.Format(_p0.X)).Append(" ");
+            sb.Append(OrdinateFormat.Default.Format(_p0.Y)).Append(", ");
+            sb.Append(OrdinateFormat.Default.Format(_p1.X)).Append(" ");
+            sb.Append(OrdinateFormat.Default.Format(_p1.Y)).Append(")");
             return sb.ToString();
         }
 

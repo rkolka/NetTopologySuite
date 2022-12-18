@@ -131,6 +131,18 @@ namespace NetTopologySuite.Tests.NUnit.Geometries
             CheckReflect(0, 1, 10, 1, 1, 2, 1, 0);
         }
 
+        [Test]
+        public void TestToString()
+        {
+            double x0 = Math.PI, y0 = 5;
+            double x1 = Math.E, y1 = 1 / 5;
+
+            var ls = new LineSegment(x0, y0, x1, y1);
+            var gm = ls.ToGeometry(NtsGeometryServices.Instance.CreateGeometryFactory());
+
+            Assert.That(ls.ToString(), Is.EqualTo(gm.AsText()));
+        }
+
         void CheckReflect(double x0, double y0, double x1, double y1, double x, double y,
             double expectedX, double expectedY)
         {
@@ -165,6 +177,7 @@ namespace NetTopologySuite.Tests.NUnit.Geometries
             CheckOrientationIndex(seg, 100, 99, 105, 96, -1);
 
             CheckOrientationIndex(seg, 200, 200, 210, 210, 0);
+            CheckOrientationIndex(seg, 105, 105, 110, 100, -1);
 
         }
 
@@ -191,7 +204,12 @@ namespace NetTopologySuite.Tests.NUnit.Geometries
         {
             var seg2 = new LineSegment(s0x, s0y, s1x, s1y);
             int orient = seg.OrientationIndex(seg2);
-            Assert.IsTrue(orient == expectedOrient);
+            string msg = string.Empty;
+            if (orient != expectedOrient)
+            {
+                msg = $"orientationIndex of {seg} and {seg2}";
+            }
+            Assert.That(orient, Is.EqualTo(expectedOrient), msg);
         }
     }
 }
