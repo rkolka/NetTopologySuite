@@ -1,5 +1,7 @@
 using System;
+using System.Buffers.Text;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Linq;
 
 using NetTopologySuite.Geometries;
@@ -199,15 +201,17 @@ namespace NetTopologySuite.Algorithm
         }
 
         /// <summary>
-        /// Pre sorts the coordinates
+        /// Sorts the points radially CW around the point with minimum Y and then X.
         /// </summary>
-        /// <param name="pts"></param>
-        /// <returns></returns>
+        /// <param name="pts">The points to sort</param>
+        /// <returns>The sorted points</returns>
         private static Coordinate[] PreSort(Coordinate[] pts)
         {
-            // find the lowest point in the set. If two or more points have
-            // the same minimum y coordinate choose the one with the minimu x.
-            // This focal point is put in array location pts[0].
+            /*
+             * find the lowest point in the set. If two or more points have
+             * the same minimum Y coordinate choose the one with the minimum X.
+             * This focal point is put in array location pts[0].
+             */
             for (int i = 1; i < pts.Length; i++)
             {
                 if ((pts[i].Y < pts[0].Y) || ((pts[i].Y == pts[0].Y)
@@ -237,39 +241,20 @@ namespace NetTopologySuite.Algorithm
             ps.Push(c[2]);
             for (int i = 3; i < c.Length; i++)
             {
+                var cp = c[i];
                 var p = ps.Pop();
 
                 // check for empty stack to guard against robustness problems
                 while (
                     ps.Count > 0 /*(IsEmpty Hack)*/ &&
-                    Orientation.Index(ps.Peek(), p, c[i]) > 0)
+                    Orientation.Index(ps.Peek(), p, cp) > 0)
                     p = ps.Pop();
                 ps.Push(p);
-                ps.Push(c[i]);
+                ps.Push(cp);
             }
             ps.Push(c[0]);
             return ps;
         }
-
-        /*
-        /// <summary>
-        ///
-        /// </summary>
-        /// <param name="ps"></param>
-        /// <returns></returns>
-        private Stack<Coordinate> ReverseStack(Stack<Coordinate> ps)
-        {
-            // Do a manual reverse of the stack
-            int size = ps.Count;
-            var tempArray = new Coordinate[size];
-            for (int i = 0; i < size; i++)
-                tempArray[i] = ps.Pop();
-            var returnStack = new Stack<Coordinate>(size);
-            foreach (Coordinate obj in tempArray)
-                returnStack.Push(obj);
-            return returnStack;
-        }
-        */
 
         /// <summary>
         ///
@@ -406,15 +391,22 @@ namespace NetTopologySuite.Algorithm
         /// <summary>
         /// Compares <see cref="Coordinate" />s for their angle and distance
         /// relative to an origin.
+        /// <para/>
+        /// The origin is assumed to be lower in Y and then X than
+        /// all other point inputs.
+        /// The points are ordered CCW around the origin
         /// </summary>
         private class RadialComparator : IComparer<Coordinate>
         {
             private readonly Coordinate _origin;
 
             /// <summary>
-            /// Initializes a new instance of the <see cref="RadialComparator"/> class.
+            /// Creates a new comparator using a given origin.
+            /// The origin must be lower in Y and then X to all
+            /// compared points,
+            /// using <see cref="Coordinate.CompareTo(Coordinate)"/>.
             /// </summary>
-            /// <param name="origin"></param>
+            /// <param name="origin">The origin of the radial comparison</param>
             public RadialComparator(Coordinate origin)
             {
                 _origin = origin;
@@ -428,38 +420,58 @@ namespace NetTopologySuite.Algorithm
             /// <returns></returns>
             public int Compare(Coordinate p1, Coordinate p2)
             {
-                return PolarCompare(_origin, p1, p2);
+                int comp = PolarCompare(_origin, p1, p2);
+                return comp;
             }
 
             /// <summary>
-            ///
+            /// Given two points p and q compare them with respect to their radial
+            /// ordering about point o.<br/>
+            /// First checks radial ordering using a CCW orientation.
+            /// If the points are collinear, the comparison is based
+            /// on their distance to the origin.
+            /// <para/>
+            /// p &lt; q iff
+            /// <list type="bullet">
+            /// <item><description><c>ang(o-p) &lt; ang(o-q)</c> (e.g.o-p-q is CCW)</description></item>
+            /// <item><description><c>or ang(o-p) == ang(o-q) &amp;&amp; dist(o, p) &lt; dist(o, q)</c></description></item>
+            /// </list>
             /// </summary>
-            /// <param name="o"></param>
-            /// <param name="p"></param>
-            /// <param name="q"></param>
-            /// <returns></returns>
+            /// <param name="o">The origin</param>
+            /// <param name="p">A point</param>
+            /// <param name="q">Another point</param>
+            /// <returns>-1, 0 or 1 depending on whether p is less than,
+            /// equal to or greater than q</returns>
             private static int PolarCompare(Coordinate o, Coordinate p, Coordinate q)
             {
-                double dxp = p.X - o.X;
-                double dyp = p.Y - o.Y;
-                double dxq = q.X - o.X;
-                double dyq = q.Y - o.Y;
-
                 var orient = Orientation.Index(o, p, q);
+                if (orient == OrientationIndex.CounterClockwise) return 1;
+                if (orient == OrientationIndex.Clockwise) return -1;
 
-                if(orient == OrientationIndex.CounterClockwise)
-                    return 1;
-                if(orient == OrientationIndex.Clockwise)
-                    return -1;
+                /*
+                 * The points are collinear,
+                 * so compare based on distance from the origin.  
+                 * The points p and q are >= to the origin,
+                 * so they lie in the closed half-plane above the origin.
+                 * If they are not in a horizontal line, 
+                 * the Y ordinate can be tested to determine distance.
+                 * This is more robust than computing the distance explicitly.
+                 */
+                if (p.Y > q.Y) return 1;
+                if (p.Y < q.Y) return -1;
 
-                // points are collinear - check distance
-                double op = dxp * dxp + dyp * dyp;
-                double oq = dxq * dxq + dyq * dyq;
-                if (op < oq)
-                    return -1;
-                if (op > oq)
-                    return 1;
+                /*
+                 * The points lie in a horizontal line, which should also contain the origin
+                 * (since they are collinear).
+                 * Also, they must be above the origin.
+                 * Use the X ordinate to determine distance. 
+                 */
+                if (p.X > q.X) return 1;
+                if (p.X < q.X) return -1;
+
+                // Assert: p = q
                 return 0;
+
             }
         }
 
