@@ -10,6 +10,10 @@
     <ApiCompatExcludeAttributeList>ApiCompatExcludeAttributes.txt</ApiCompatExcludeAttributeList>
   </PropertyGroup>
 
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <Optimize>False</Optimize>
+  </PropertyGroup>
+
   <PropertyGroup Label="Assembly Info">
     <AssemblyTitle>NetTopologySuite</AssemblyTitle>
     <Description>A .NET library for GIS operations, direct porting of JTS Topology Suite $(JTSCompatibilityLevel) library</Description>

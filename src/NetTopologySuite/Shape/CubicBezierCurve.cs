@@ -163,12 +163,55 @@ namespace NetTopologySuite.Shape
                 }));
         }
 
+        public static Geometry CreateControls(Geometry geom, double alpha, double skew)
+        {
+            var curve = new CubicBezierCurve(geom, alpha, skew);
+            return curve.GetControls();
+        }
+        /// <summary>
+        /// Gets the Control points of Bezier curve geometry
+        /// </summary>
+        /// <returns>The control point geometry</returns>
+        public Geometry GetControls()
+        {
+
+            return GeometryMapper.FlatMap(_inputGeom, Dimension.Curve,
+                new GeometryMapper.MapOp((geom) => {
+                    if (geom is LineString)
+                        return BezierLineControls((LineString)geom);
+                    if (geom is Polygon)
+                        return BezierPolygonControls((Polygon)geom);
+
+                    //-- Points
+                    return geom.Copy();
+                }));
+        }
+
         private LineString BezierLine(LineString ls)
         {
             var coords = ls.Coordinates;
             var curvePts = BezierCurve(coords, false);
             curvePts.Add(coords[coords.Length - 1].Copy(), false);
             return _geomFactory.CreateLineString(curvePts.ToCoordinateArray());
+        }
+        private LineString BezierLineControls(LineString ls)
+        {
+            return _geomFactory.CreateLineString(ControlPoints(ls.Coordinates, false));
+        }
+
+        private Polygon BezierPolygonControls(Polygon poly)
+        {
+            var shell = _geomFactory.CreateLinearRing(ControlPoints(poly.ExteriorRing.Coordinates, true));
+            LinearRing[] holes = null;
+            if (poly.NumInteriorRings > 0)
+            {
+                holes = new LinearRing[poly.NumInteriorRings];
+                for (int i = 0; i < poly.NumInteriorRings; i++)
+                {
+                    holes[i] = _geomFactory.CreateLinearRing(ControlPoints(poly.GetInteriorRingN(i).Coordinates, true));
+                }
+            }
+            return _geomFactory.CreatePolygon(shell, holes);
         }
 
         private LinearRing BezierRing(LinearRing ring)
