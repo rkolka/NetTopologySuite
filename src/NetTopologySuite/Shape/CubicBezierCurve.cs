@@ -82,7 +82,7 @@ namespace NetTopologySuite.Shape
         }
 
         private readonly double _minSegmentLength = 0.0;
-        private readonly int _numVerticesPerSegment = 16;
+        private static readonly int _numVerticesPerSegment = 16;
 
         private readonly Geometry _inputGeom;
         private readonly double _alpha = -1;
@@ -92,7 +92,7 @@ namespace NetTopologySuite.Shape
         private int _controlPointIndex;
   
         private Coordinate[] bezierCurvePts;
-        private double[][] interpolationParam;
+        private static readonly double[,] interpolationParam = ComputeIterpolationParameters(_numVerticesPerSegment);
 
         /// <summary>
         /// Creates a new instance producing a Bezier curve defined by a geometry
@@ -149,7 +149,6 @@ namespace NetTopologySuite.Shape
         public Geometry GetResult()
         {
             bezierCurvePts = new Coordinate[_numVerticesPerSegment];
-            interpolationParam = ComputeIterpolationParameters(_numVerticesPerSegment);
 
             return GeometryMapper.FlatMap(_inputGeom, Dimension.Curve,
                 new GeometryMapper.MapOp( (geom) => {
@@ -451,7 +450,7 @@ namespace NetTopologySuite.Shape
         /// <param name="curve">An array to hold generated points.</param>
         private static void CubicBezier(Coordinate p0,
             Coordinate p1, Coordinate ctrl1,
-            Coordinate ctrl2, double[][] param,
+            Coordinate ctrl2, double[,] param,
             Coordinate[] curve)
         {
 
@@ -462,11 +461,9 @@ namespace NetTopologySuite.Shape
             for (int i = 1; i < n - 1; i++)
             {
                 var c = new Coordinate();
-                double sum = param[i][0] + param[i][1] + param[i][2] + param[i][3];
-                c.X = param[i][0] * p0.X + param[i][1] * ctrl1.X + param[i][2] * ctrl2.X + param[i][3] * p1.X;
-                c.X /= sum;
-                c.Y = param[i][0] * p0.Y + param[i][1] * ctrl1.Y + param[i][2] * ctrl2.Y + param[i][3] * p1.Y;
-                c.Y /= sum;
+                double sum = param[i, 0] + param[i, 1] + param[i, 2] + param[i, 3];
+                c.X = param[i, 0] * p0.X + param[i, 1] * ctrl1.X + param[i, 2] * ctrl2.X + param[i, 3] * p1.X;
+                c.Y = param[i, 0] * p0.Y + param[i, 1] * ctrl1.Y + param[i, 2] * ctrl2.Y + param[i, 3] * p1.Y;
 
                 curve[i] = c;
             }
@@ -478,22 +475,41 @@ namespace NetTopologySuite.Shape
         /// </summary>
         /// <param name="n">The number of vertices</param>
         /// <returns>An array of double[4] holding the parameter values</returns>
-        private static double[][] ComputeIterpolationParameters(int n)
+        private static double[,] ComputeIterpolationParameters(int n)
         {
-            double[][] param = new double[n][];
-            for (int i = 0; i < n; i++)
+            int iterations = (n >> 1) + 1;
+            double[,] param = new double[n + 1, 4];
+            for (int i = 0; i < iterations; i++)
             {
-                param[i] = new double[4];
-                double t = (double)i / (n - 1);
+                double t = (double)i / n;
                 double tc = 1.0 - t;
+                double remaining = 1;
+                double temp;
 
-                param[i][0] = tc * tc * tc;
-                param[i][1] = 3.0 * tc * tc * t;
-                param[i][2] = 3.0 * tc * t * t;
-                param[i][3] = t * t * t;
+                temp = tc * tc * tc;
+                param[i, 0] = temp;
+                param[n - i, 3] = temp;
+                remaining -= temp;
+
+                temp = 3.0 * tc * tc * t;
+                param[i, 1] = temp;
+                param[n - i, 2] = temp;
+                remaining -= temp;
+
+                temp = 3.0 * tc * t * t;
+                param[i, 2] = temp;
+                param[n - i, 1] = temp;
+                remaining -= temp;
+
+                param[i, 3] = remaining;
+                param[n - i, 0] = remaining;
+
+                //double diff = remaining - t * t * t;
+                //Console.WriteLine(diff.ToString("R"));
             }
             return param;
         }
+
 
 
     }
