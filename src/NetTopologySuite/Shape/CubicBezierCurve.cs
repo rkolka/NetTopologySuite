@@ -485,24 +485,25 @@ namespace NetTopologySuite.Shape
                 double tc = 1.0 - t;
                 double remaining = 1;
                 double temp;
+                int j = n - i;
 
                 temp = tc * tc * tc;
                 param[i, 0] = temp;
-                param[n - i, 3] = temp;
+                param[j, 3] = temp;
                 remaining -= temp;
 
                 temp = 3.0 * tc * tc * t;
                 param[i, 1] = temp;
-                param[n - i, 2] = temp;
+                param[j, 2] = temp;
                 remaining -= temp;
 
                 temp = 3.0 * tc * t * t;
                 param[i, 2] = temp;
-                param[n - i, 1] = temp;
+                param[j, 1] = temp;
                 remaining -= temp;
 
                 param[i, 3] = remaining;
-                param[n - i, 0] = remaining;
+                param[j, 0] = remaining;
 
                 //double diff = remaining - t * t * t;
                 //Console.WriteLine(diff.ToString("R"));
